@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Insuracle Demo</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+  <div id="root"></div>
+
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://unpkg.com/ethers@6.14.0/dist/ethers.umd.min.js"></script>
+
+  <script type="text/babel">
+    const { ethers } = window.ethers;
+    const { useState, useEffect } = React;
+
+    const INSURACLE_ADDRESS = "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512"
+    const INSURACLE_ABI = [
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "_priceFeedAddress",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+      },
+      {
+        "inputs": [],
+        "name": "AccessControlBadConfirmation",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "internalType": "bytes32",
+            "name": "neededRole",
+            "type": "bytes32"
+          }
+        ],
+        "name": "AccessControlUnauthorizedAccount",
+        "type": "error"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "customer",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "premium",
+            "type": "uint256"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "coverage",
+            "type": "uint256"
+          }
+        ],
+        "name": "InsurancePurchased",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "customer",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          }
+        ],
+        "name": "PayoutTriggered",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "bytes32",
+            "name": "role",
+            "type": "bytes32"
+          },
+          {
+            "indexed": true,
+            "internalType": "bytes32",
+            "name": "previousAdminRole",
+            "type": "bytes32"
+          },
+          {
+            "indexed": true,
+            "internalType": "bytes32",
+            "name": "newAdminRole",
+            "type": "bytes32"
+          }
+        ],
+        "name": "RoleAdminChanged",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "bytes32",
+            "name": "role",
+            "type": "bytes32"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "sender",
+            "type": "address"
+          }
+        ],
+        "name": "RoleGranted",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "bytes32",
+            "name": "role",
+            "type": "bytes32"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "sender",
+            "type": "address"
+          }
+        ],
+        "name": "RoleRevoked",
+        "type": "event"
+      },
+      {
+        "inputs": [],
+        "name": "DEFAULT_ADMIN_ROLE",
+        "outputs": [
+          {
+            "internalType": "bytes32",
+            "name": "",
+            "type": "bytes32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "FLOOD_THRESHOLD",
+        "outputs": [
+          {
+            "internalType": "int256",
+            "name": "",
+            "type": "int256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "INSURANCE_ADMIN_ROLE",
+        "outputs": [
+          {
+            "internalType": "bytes32",
+            "name": "",
+            "type": "bytes32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "ORACLE_UPDATER_ROLE",
+        "outputs": [
+          {
+            "internalType": "bytes32",
+            "name": "",
+            "type": "bytes32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "_coverage",
+            "type": "uint256"
+          }
+        ],
+        "name": "buyInsurance",
+        "outputs": [],
+        "stateMutability": "payable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "getContractBalance",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "getLatestPrice",
+        "outputs": [
+          {
+            "internalType": "int256",
+            "name": "",
+            "type": "int256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32",
+            "name": "role",
+            "type": "bytes32"
+          }
+        ],
+        "name": "getRoleAdmin",
+        "outputs": [
+          {
+            "internalType": "bytes32",
+            "name": "",
+            "type": "bytes32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32",
+            "name": "role",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          }
+        ],
+        "name": "grantRole",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32",
+            "name": "role",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          }
+        ],
+        "name": "hasRole",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "insuranceAmount",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "isInitialized",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "name": "policies",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "customer",
+            "type": "address"
+          },
+          {
+            "internalType": "uint256",
+            "name": "premium",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "coverage",
+            "type": "uint256"
+          },
+          {
+            "internalType": "bool",
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "internalType": "bool",
+            "name": "paidOut",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "priceFeed",
+        "outputs": [
+          {
+            "internalType": "contract AggregatorV3Interface",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32",
+            "name": "role",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "callerConfirmation",
+            "type": "address"
+          }
+        ],
+        "name": "renounceRole",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes32",
+            "name": "role",
+            "type": "bytes32"
+          },
+          {
+            "internalType": "address",
+            "name": "account",
+            "type": "address"
+          }
+        ],
+        "name": "revokeRole",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "_amount",
+            "type": "uint256"
+          }
+        ],
+        "name": "setInsuranceAmount",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "address",
+            "name": "_oracleAddress",
+            "type": "address"
+          }
+        ],
+        "name": "setOracleAddress",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "bytes4",
+            "name": "interfaceId",
+            "type": "bytes4"
+          }
+        ],
+        "name": "supportsInterface",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "triggerPayout",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "withdraw",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "stateMutability": "payable",
+        "type": "receive"
+      }
+    ];
+
+    function App() {
+      const [account, setAccount] = useState(null);
+      const [floodLevel, setFloodLevel] = useState(null);
+      const [floodThreshold, setFloodThreshold] = useState(null);
+      const [insuranceAmount, setInsuranceAmount] = useState(null);
+      const [contractBalance, setContractBalance] = useState(null);
+      const [userBalance, setUserBalance] = useState(null);
+      const [policy, setPolicy] = useState(null);
+      const [coverageInput, setCoverageInput] = useState("");
+      const [fundAmount, setFundAmount] = useState("");
+      const [newFloodLevel, setNewFloodLevel] = useState("");
+      const [roles, setRoles] = useState({
+        admin: false,
+        oracleUpdater: false,
+        insuranceAdmin: false,
+      });
+      const [error, setError] = useState(null);
+      const [txStatus, setTxStatus] = useState(null);
+
+      const connectWallet = async () => {
+        if (window.ethereum) {
+          try {
+            const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+            setAccount(accounts[0]);
+            setError(null);
+          } catch (err) {
+            setError("Failed to connect wallet: " + err.message);
+          }
+        } else {
+          setError("Please install MetaMask");
+        }
+      };
+
+      const fetchContractData = async () => {
+        if (!account) return;
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const contract = new ethers.Contract(INSURACLE_ADDRESS, INSURACLE_ABI, provider);
+
+          // Fetch flood level
+          const level = await contract.getLatestPrice();
+          setFloodLevel(ethers.formatUnits(level, 8));
+
+          // Fetch flood threshold
+          const threshold = await contract.FLOOD_THRESHOLD();
+          setFloodThreshold(ethers.formatUnits(threshold, 8));
+
+          // Fetch insurance amount
+          const amount = await contract.insuranceAmount();
+          setInsuranceAmount(ethers.formatUnits(amount, 0));
+
+          // Fetch contract balance
+          const balance = await contract.getContractBalance();
+          setContractBalance(ethers.formatEther(balance));
+
+          // Fetch user balance
+          const userBal = await provider.getBalance(account);
+          setUserBalance(ethers.formatEther(userBal));
+
+          // Fetch policy
+          const policyData = await contract.policies(account);
+          setPolicy({
+            active: policyData.active,
+            premium: ethers.formatEther(policyData.premium),
+            coverage: ethers.formatEther(policyData.coverage),
+            paidOut: policyData.paidOut,
+          });
+
+          // Fetch roles
+          const adminRole = await contract.DEFAULT_ADMIN_ROLE();
+          const oracleRole = await contract.ORACLE_UPDATER_ROLE();
+          const insuranceRole = await contract.INSURANCE_ADMIN_ROLE();
+          const [isAdmin, isOracleUpdater, isInsuranceAdmin] = await Promise.all([
+            contract.hasRole(adminRole, account),
+            contract.hasRole(oracleRole, account),
+            contract.hasRole(insuranceRole, account),
+          ]);
+          setRoles({
+            admin: isAdmin,
+            oracleUpdater: isOracleUpdater,
+            insuranceAdmin: isInsuranceAdmin,
+          });
+          setError(null);
+        } catch (err) {
+          setError("Error fetching data: " + err.message);
+        }
+      };
+
+      const buyInsurance = async () => {
+        if (!account || !coverageInput) return;
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const signer = await provider.getSigner();
+          const contract = new ethers.Contract(INSURACLE_ADDRESS, INSURACLE_ABI, signer);
+
+          const coverage = ethers.parseEther(coverageInput);
+          const premium = coverage / BigInt(10);
+          setTxStatus("Sending transaction...");
+          const tx = await contract.buyInsurance(coverage, { value: premium });
+          await tx.wait();
+          setTxStatus("Insurance purchased!");
+          setCoverageInput("");
+          await fetchContractData();
+        } catch (err) {
+          setError("Error buying insurance: " + err.message);
+          setTxStatus(null);
+        }
+      };
+
+      const triggerPayout = async () => {
+        if (!account) return;
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const signer = await provider.getSigner();
+          const contract = new ethers.Contract(INSURACLE_ADDRESS, INSURACLE_ABI, signer);
+
+          setTxStatus("Triggering payout...");
+          const tx = await contract.triggerPayout();
+          await tx.wait();
+          setTxStatus("Payout successful!");
+          await fetchContractData();
+        } catch (err) {
+          setError("Error triggering payout: " + err.message);
+          setTxStatus(null);
+        }
+      };
+
+      const updateFloodLevel = async () => {
+        if (!account || !newFloodLevel) return;
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const signer = await provider.getSigner();
+          const contract = new ethers.Contract(INSURACLE_ADDRESS, INSURACLE_ABI, signer);
+          const mockContract = new ethers.Contract(
+            await contract.priceFeed(),
+            [
+              {
+                inputs: [{ internalType: "int256", name: "_answer", type: "int256" }],
+                name: "updateAnswer",
+                outputs: [],
+                stateMutability: "nonpayable",
+                type: "function",
+              },
+            ],
+            signer
+          );
+
+          const level = ethers.parseUnits(newFloodLevel, 8);
+          setTxStatus("Updating flood level...");
+          const tx = await mockContract.updateAnswer(level);
+          await tx.wait();
+          setTxStatus("Flood level updated!");
+          setNewFloodLevel("");
+          await fetchContractData();
+        } catch (err) {
+          setError("Error updating flood level: " + err.message);
+          setTxStatus(null);
+        }
+      };
+
+      const fundContract = async () => {
+        if (!account || !fundAmount) return;
+        try {
+          const provider = new ethers.BrowserProvider(window.ethereum);
+          const signer = await provider.getSigner();
+
+          const amount = ethers.parseEther(fundAmount);
+          setTxStatus("Funding contract...");
+          const tx = await signer.sendTransaction({
+            to: INSURACLE_ADDRESS,
+            value: amount,
+          });
+          await tx.wait();
+          setTxStatus("Contract funded!");
+          setFundAmount("");
+          await fetchContractData();
+        } catch (err) {
+          setError("Error funding contract: " + err.message);
+          setTxStatus(null);
+        }
+      };
+
+      useEffect(() => {
+        if (account) fetchContractData();
+      }, [account]);
+
+      return (
+        <div className="bg-white p-8 rounded-lg shadow-lg max-w-lg w-full">
+          <img src="https://via.placeholder.com/300x100?text=Insuracle+Logo" alt="Insuracle Logo" className="mx-auto mb-4" />
+          <h1 className="text-2xl font-bold mb-4 text-center">Insuracle: Flood Insurance Oracle</h1>
+          <p className="text-gray-600 mb-6 text-center">
+            Buy flood insurance and claim payouts if flood levels exceed the threshold.
+          </p>
+          {!account ? (
+            <button
+              onClick={connectWallet}
+              className="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+            >
+              Connect Wallet
+            </button>
+          ) : (
+            <div>
+              <p className="text-sm text-gray-600 mb-4">
+                Connected: {account.slice(0, 6)}...{account.slice(-4)}
+              </p>
+              <p className="text-sm text-gray-600 mb-4">
+                Your Balance: {userBalance !== null ? `${userBalance.slice(0, 8)} ETH` : "Loading..."}
+              </p>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold">Flood Level</h2>
+                <p className="text-gray-800">
+                  {floodLevel !== null ? `${floodLevel} units` : "Loading..."} (Threshold: {floodThreshold !== null ? floodThreshold : "Loading..."})
+                </p>
+                {roles.oracleUpdater && (
+                  <div className="mt-2">
+                    <input
+                      type="number"
+                      value={newFloodLevel}
+                      onChange={(e) => setNewFloodLevel(e.target.value)}
+                      placeholder="New flood level"
+                      className="w-full p-2 border rounded mb-2"
+                    />
+                    <button
+                      onClick={updateFloodLevel}
+                      className="w-full bg-purple-600 text-white py-2 px-4 rounded hover:bg-purple-700"
+                    >
+                      Update Flood Level
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold">Insurance Policy</h2>
+                {policy && policy.active ? (
+                  <div>
+                    <p>Premium: {policy.premium} ETH</p>
+                    <p>Coverage: {policy.coverage} ETH</p>
+                    <p>Status: {policy.paidOut ? "Paid Out" : "Active"}</p>
+                    {!policy.paidOut && (
+                      <button
+                        onClick={triggerPayout}
+                        className="w-full bg-red-600 text-white py-2 px-4 rounded hover:bg-red-700 mt-2"
+                      >
+                        Trigger Payout
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <p>No active policy</p>
+                    <input
+                      type="number"
+                      value={coverageInput}
+                      onChange={(e) => setCoverageInput(e.target.value)}
+                      placeholder="Coverage amount (ETH)"
+                      className="w-full p-2 border rounded mb-2"
+                    />
+                    <p className="text-sm text-gray-600 mb-2">
+                      Premium: {coverageInput ? (coverageInput / 10).toFixed(4) : "0"} ETH
+                    </p>
+                    <button
+                      onClick={buyInsurance}
+                      className="w-full bg-green-600 text-white py-2 px-4 rounded hover:bg-green-700"
+                    >
+                      Buy Insurance
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div className="mb-4">
+                <h2 className="text-lg font-semibold">Contract Info</h2>
+                <p>Insurance Amount: {insuranceAmount !== null ? `${insuranceAmount} units` : "Loading..."}</p>
+                <p>Contract Balance: {contractBalance !== null ? `${contractBalance} ETH` : "Loading..."}</p>
+                {contractBalance !== null && parseFloat(contractBalance) < 1 && (
+                  <p className="text-yellow-600 mt-2">Warning: Contract balance is low for payouts!</p>
+                )}
+                {roles.admin && (
+                  <div className="mt-2">
+                    <input
+                      type="number"
+                      value={fundAmount}
+                      onChange={(e) => setFundAmount(e.target.value)}
+                      placeholder="Fund amount (ETH)"
+                      className="w-full p-2 border rounded mb-2"
+                    />
+                    <button
+                      onClick={fundContract}
+                      className="w-full bg-yellow-600 text-white py-2 px-4 rounded hover:bg-yellow-700"
+                    >
+                      Fund Contract
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Roles</h2>
+                <p className={roles.admin ? "text-green-600" : "text-red-600"}>
+                  Admin: {roles.admin ? "Yes" : "No"}
+                </p>
+                <p className={roles.oracleUpdater ? "text-green-600" : "text-red-600"}>
+                  Oracle Updater: {roles.oracleUpdater ? "Yes" : "No"}
+                </p>
+                <p className={roles.insuranceAdmin ? "text-green-600" : "text-red-600"}>
+                  Insurance Admin: {roles.insuranceAdmin ? "Yes" : "No"}
+                </p>
+              </div>
+            </div>
+          )}
+          {error && <p className="text-red-600 mt-4">{error}</p>}
+          {txStatus && <p className="text-green-600 mt-4">{txStatus}</p>}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById("root"));
+  </script>
+</body>
+</html>
