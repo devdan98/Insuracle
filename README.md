@@ -13,25 +13,18 @@ Designed for presentation to the Polkadot ecosystem, Insuracle highlights the po
 - **Frontend Interface**: A React-based UI allows users to connect wallets, buy insurance, update flood levels, and trigger payouts.
 - **Mock Oracle**: A `MockV3Aggregator` simulates Chainlink flood level data for local testing.
 
-### Polkadot Relevance
-Insuracle’s modular design makes it suitable for Polkadot parachains:
-- **Moonbeam**: Deploy Ethereum-compatible smart contracts with minimal changes.
-- **Substrate**: Reimplement as a pallet with Polkadot’s oracle solutions (e.g., Acala’s Oracle or custom off-chain workers).
-- **Cross-Chain**: Leverage Polkadot’s interoperability for multi-chain insurance pools or data feeds.
-
 ## Prerequisites
 
 - **Node.js**: Version 18.x or 23.x (tested with 23.9.0).
 - **MetaMask**: Browser extension for wallet interactions.
 - **Git**: To clone the repository.
 - **Hardhat**: For contract deployment and testing.
-- **Python 3** (optional): For alternative frontend serving if `http-server` is unavailable.
 
 ## Installation
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/your-username/insuracle.git
+   git clone https://github.com/devdan98/insuracle.git
    cd insuracle
    ```
 
@@ -45,7 +38,6 @@ Insuracle’s modular design makes it suitable for Polkadot parachains:
    ```bash
    npm install -g http-server
    ```
-   - Alternatively, use Python’s HTTP server (see Usage).
 
 4. **Verify Hardhat Configuration**:
    - Ensure `hardhat.config.js` is set up for the `localhost` network:
@@ -242,13 +234,8 @@ insuracle/
 
 ## Future Enhancements
 
-- **Polkadot Integration**:
-  - Deploy on Moonbeam for EVM compatibility.
-  - Develop a Substrate pallet with Polkadot’s oracle solutions.
-  - Use XCM for cross-chain insurance pools.
 - **Real Oracle Data**: Replace `MockV3Aggregator` with Chainlink’s flood level data feed.
 - **Multi-Policy Support**: Allow users to hold multiple policies.
-- **Frontend Polish**: Add a custom logo, improve UX, and support mobile views.
 
 ## Troubleshooting
 
@@ -270,7 +257,7 @@ MIT License. See [LICENSE](./LICENSE) for details.
 
 ## Contact
 
-For questions or feedback, open an issue on GitHub or contact the team at [your-email@example.com].
+For questions or feedback, open an issue on GitHub.
 
 ---
 
