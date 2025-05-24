@@ -2,7 +2,7 @@
 
 ## Overview
 
-**Insuracle** is a proof of concept (PoC) for a decentralized flood insurance platform built on Ethereum, demonstrating automated insurance purchases and payouts triggered by flood level data from a Chainlink-compatible oracle. This PoC showcases a smart contract (`Insuracle.sol`) that allows users to buy flood insurance policies and claim payouts when flood levels exceed a predefined threshold, with role-based access control for secure administration.
+**Insuracle** is a proof of concept (PoC) for a decentralized parametric flood insurance platform built on Ethereum, demonstrating automated insurance purchases and payouts triggered by flood level data from a Chainlink-compatible oracle. This PoC showcases a smart contract (`Insuracle.sol`) that allows users to buy flood insurance policies and claim payouts when flood levels exceed a predefined threshold, with role-based access control for secure administration.
 
 ![image](https://github.com/user-attachments/assets/b83e63d6-3079-46d9-a241-b5275baf006a)
 
