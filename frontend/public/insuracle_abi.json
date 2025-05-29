@@ -1,0 +1,27 @@
+{
+  "source": {
+    "hash": "0xb743cec800e3254b329cbf986c0efdf8bb5424a966e789c917b10752c8b1c363",
+    "language": "ink! 5.1.1",
+    "compiler": "rustc 1.85.0-nightly",
+    "build_info": {
+      "build_mode": "Release",
+      "cargo_contract_version": "4.1.3",
+      "rust_toolchain": "nightly-x86_64-unknown-linux-gnu",
+      "wasm_opt_settings": {
+        "keep_debug_symbols": false,
+        "optimization_passes": "Z"
+      }
+    }
+  },
+  "contract": {
+    "name": "insuracle",
+    "version": "0.1.0",
+    "authors": [
+      "[your_name] <[your_email]>"
+    ]
+  },
+  "spec": { },
+  "storage": { },
+  "types": [ ],
+  "version": 5
+}
