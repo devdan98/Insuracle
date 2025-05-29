@@ -19,7 +19,10 @@
   ```bash
   cargo install cargo-contract --force
   ```
-- **Substrate Contracts Node**: For local testing ([download here](https://github.com/paritytech/substrate-contracts-node/releases))
+- **Substrate Contracts Node**: For local testing ([download here](https://github.com/paritytech/substrate-contracts-node/releases)) **OR**:
+  ```bash
+  cargo install contracts-node
+  ```
 - **Polkadot.js Extension**: For wallet interactions ([install here](https://polkadot.js.org/extension/)).
 - **Node.js**: For frontend (React) development.
 - **Git**: To clone the repository.
@@ -63,6 +66,12 @@ wget https://github.com/paritytech/substrate-contracts-node/releases/latest/down
 # (If on Codespaces or Linux)
 tar -xf substrate-contracts-node-linux-x86_64.tar.xz
 ./substrate-contracts-node --dev
+```
+
+Or if installed using cargo:
+
+```bash
+substrate-contracts-node
 ```
 
 - The node will listen on `ws://127.0.0.1:9944` by default.
