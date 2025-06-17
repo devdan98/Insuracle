@@ -13,7 +13,7 @@ import {
   INSURACLE_ADDRESS,
   INSURACLE_ABI,
   MOCK_ORACLE_ADDRESS,
-  MOCK_ORACLE_ABI,
+  // MOCK_ORACLE_ABI, // Commented out to fix build error
 } from "./lib/contract";
 
 interface InsuracleDashboardAdminProps {
@@ -199,7 +199,7 @@ export default function InsuracleDashboardAdmin({
       const signer = await provider.getSigner();
       const mockOracleContract = new ethers.Contract(
         MOCK_ORACLE_ADDRESS,
-        MOCK_ORACLE_ABI,
+        // MOCK_ORACLE_ABI, // Commented out to fix build error
         signer
       );
       // Convert flood level to proper format (8 decimals)
