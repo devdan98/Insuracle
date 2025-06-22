@@ -1,7 +1,7 @@
 // This file contains the deployed contract addresses and ABIs for the frontend to use
-export const INSURACLE_ADDRESS = "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512";
-export const MOCK_ORACLE_ADDRESS = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
+export const INSURACLE_ADDRESS = "0xa513E6E4b8f2a923D98304ec87F64353C4D5C853";
+export const MOCK_ORACLE_ADDRESS = "0x0165878A594ca255338adfa4d48449f69242Eb8F";
 import INSURACLE_ABI_JSON from "../../../insuracle-abi.json";
-// import MOCK_ORACLE_ABI_JSON from "../../../mock-aggregator-abi.json"; // Update this if you have the correct ABI file
-export const INSURACLE_ABI = INSURACLE_ABI_JSON.abi as any;
-// export const MOCK_ORACLE_ABI = MOCK_ORACLE_ABI_JSON as any; // Uncomment and update if you have the correct ABI
+import MOCK_ORACLE_ABI_JSON from "../../../artifacts/contracts/mocks/MockV3Aggregator.sol/MockV3Aggregator.json";
+export const INSURACLE_ABI = INSURACLE_ABI_JSON as any;
+export const MOCK_ORACLE_ABI = MOCK_ORACLE_ABI_JSON.abi as any;

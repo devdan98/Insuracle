@@ -1,560 +1,214 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { ethers } from "ethers";
-import {
-  Waves,
-  Shield,
-  TrendingUp,
-  Wallet,
-  Eye,
-  EyeOff,
-  AlertCircle,
-  CheckCircle,
-  ArrowLeft,
-} from "lucide-react";
-import { INSURACLE_ADDRESS, INSURACLE_ABI } from "./lib/contract";
+import { INSURACLE_ADDRESS, INSURACLE_ABI, MOCK_ORACLE_ADDRESS, MOCK_ORACLE_ABI } from "./lib/contract";
 
-interface InsuracleDashboardProps {
-  setUserType?: (userType: string | null) => void;
-}
+const InsuracleDashboard: React.FC = () => {
+  // State variables for flood levels
+  const [floodLevel, setFloodLevel] = useState<number>(-1);
+  const [rawFloodLevel, setRawFloodLevel] = useState<string>("Loading...");
+  const [oracleFloodLevel, setOracleFloodLevel] = useState<string>("Loading...");
+  const [floodLevelError, setFloodLevelError] = useState<string>("");
+  const [oracleError, setOracleError] = useState<string>("");
+  
+  // State for connection status
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const [account, setAccount] = useState<string>("");
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
-export default function InsuracleDashboard({
-  setUserType,
-}: InsuracleDashboardProps) {
-  const [walletAddress, setWalletAddress] = useState<string>("");
-  const [ethBalance, setEthBalance] = useState<number>(0);
-  const [floodLevel, setFloodLevel] = useState<number>(0);
-  const [threshold, setThreshold] = useState<number>(3000);
-  const [policyAmount, setPolicyAmount] = useState<number>(1);
-  const [premium, setPremium] = useState<number>(0.1);
-  const [insuranceAmount, setInsuranceAmount] = useState<number>(0);
-  const [contractBalance, setContractBalance] = useState<number>(0);
-  const [transactionStatus, setTransactionStatus] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [hasActivePolicy, setHasActivePolicy] = useState(false);
-  const [networkError, setNetworkError] = useState(false);
-
-  // Connect wallet and fetch initial data
-  useEffect(() => {
-    const fetchData = async () => {
-      if (window.ethereum) {
-        try {
-          const provider = new ethers.BrowserProvider(window.ethereum);
-
-          // Check network
-          const network = await provider.getNetwork();
-          if (network.chainId !== 31337n) {
-            // Hardhat network chainId
-            setNetworkError(true);
-            setTransactionStatus(
-              "Please connect to Hardhat network (localhost:8545, Chain ID: 31337)"
-            );
-            return;
-          } else {
-            setNetworkError(false);
-          }
-
-          const accounts = await provider.send("eth_requestAccounts", []);
-          setWalletAddress(accounts[0]);
-          const balance = await provider.getBalance(accounts[0]);
-          setEthBalance(Number(ethers.formatEther(balance)));
-
-          const contract = new ethers.Contract(
-            INSURACLE_ADDRESS,
-            INSURACLE_ABI,
-            provider
-          );
-
-          // Get contract balance
-          try {
-            const contractBal = await contract.getContractBalance();
-            setContractBalance(Number(ethers.formatEther(contractBal)));
-          } catch (e) {
-            console.warn("Could not fetch contract balance:", e);
-          }
-
-          // Get flood level
-          try {
-            const latestFlood = await contract.getLatestPrice();
-            setFloodLevel(Number(latestFlood) / 1e8); // assuming 8 decimals
-          } catch (e) {
-            console.warn("Could not fetch flood level:", e);
-          }
-
-          // Check if user has active policy
-          try {
-            const policy = await contract.policies(accounts[0]);
-            if (
-              policy.customer !==
-                "0x0000000000000000000000000000000000000000" &&
-              policy.active
-            ) {
-              setHasActivePolicy(true);
-              setInsuranceAmount(Number(ethers.formatEther(policy.coverage)));
-              setPolicyAmount(Number(ethers.formatEther(policy.coverage)));
-              setPremium(Number(ethers.formatEther(policy.premium)));
-            }
-          } catch (e) {
-            console.warn("Could not fetch policy:", e);
-          }
-        } catch (e) {
-          console.error("Error connecting to wallet:", e);
-          setTransactionStatus(
-            "Error connecting to wallet. Make sure MetaMask is installed and connected to localhost:8545"
-          );
-        }
-      }
-    };
-    fetchData();
-  }, []);
-
-  useEffect(() => {
-    setPremium(0.1 * policyAmount);
-  }, [policyAmount]);
-
-  // Buy insurance (send tx)
-  const handleBuyInsurance = async () => {
-    if (!window.ethereum) {
-      setTransactionStatus("MetaMask not detected. Please install MetaMask.");
-      return;
-    }
-
-    if (policyAmount <= 0) {
-      setTransactionStatus("Please enter a valid policy amount.");
-      return;
-    }
-
-    setIsLoading(true);
-    setTransactionStatus("Preparing transaction...");
-
-    try {
-      const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(
-        INSURACLE_ADDRESS,
-        INSURACLE_ABI,
-        signer
-      );
-
-      const coverage = ethers.parseEther(policyAmount.toString());
-      const calculatedPremium = ethers.parseEther(
-        (0.1 * policyAmount).toString()
-      );
-
-      console.log(
-        "Calling buyInsurance with coverage:",
-        coverage.toString(),
-        "and premium:",
-        calculatedPremium.toString()
-      );
-
-      setTransactionStatus("Estimating gas...");
-
-      // First estimate gas to catch any revert early
+  const connectWallet = async () => {
+    if (window.ethereum) {
       try {
-        await contract.buyInsurance.estimateGas(coverage, {
-          value: calculatedPremium,
+        const accounts = await window.ethereum.request({ 
+          method: 'eth_requestAccounts' 
         });
-      } catch (gasError) {
-        console.error("Gas estimation failed:", gasError);
-        throw new Error(
-          `Transaction would fail: ${
-            gasError.reason || gasError.message || "Unknown error"
-          }`
-        );
+        setAccount(accounts[0]);
+        setIsConnected(true);
+        return true;
+      } catch (error) {
+        console.error("Failed to connect wallet:", error);
+        return false;
       }
-
-      setTransactionStatus("Sending transaction...");
-      const tx = await contract.buyInsurance(coverage, {
-        value: calculatedPremium,
-      });
-
-      setTransactionStatus("Transaction sent. Waiting for confirmation...");
-      await tx.wait();
-
-      setTransactionStatus("Transaction successful!");
-      setHasActivePolicy(true);
-      setInsuranceAmount(policyAmount);
-
-      // Update balances
-      const balance = await provider.getBalance(walletAddress);
-      setEthBalance(Number(ethers.formatEther(balance)));
-      const contractBal = await contract.getContractBalance();
-      setContractBalance(Number(ethers.formatEther(contractBal)));
-    } catch (e: any) {
-      console.error("Transaction error:", e);
-      let errorMessage = "Unknown error";
-
-      if (e.reason) {
-        errorMessage = e.reason;
-      } else if (e.message) {
-        if (e.message.includes("user rejected")) {
-          errorMessage = "Transaction rejected by user";
-        } else if (e.message.includes("insufficient funds")) {
-          errorMessage = "Insufficient funds for transaction";
-        } else {
-          errorMessage = e.message;
-        }
-      }
-
-      setTransactionStatus(`Transaction failed: ${errorMessage}`);
     }
-
-    setIsLoading(false);
-    setTimeout(() => setTransactionStatus(""), 10000);
+    return false;
   };
 
-  // Trigger payout (send tx)
-  const handleTriggerPayout = async () => {
+  const fetchOracleData = async () => {
     if (!window.ethereum) {
-      setTransactionStatus("MetaMask not detected. Please install MetaMask.");
+      console.error("No ethereum provider found");
+      setFloodLevelError("No ethereum provider found");
       return;
     }
 
-    setIsLoading(true);
-    setTransactionStatus("Checking payout conditions...");
-
     try {
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const signer = await provider.getSigner();
-      const contract = new ethers.Contract(
-        INSURACLE_ADDRESS,
-        INSURACLE_ABI,
-        signer
-      );
+      
+      // Ensure we're connected to the right network (Hardhat localhost)
+      const network = await provider.getNetwork();
+      console.log("Connected to network:", network.chainId);
 
-      // Check if conditions are met for payout
-      const currentFlood = await contract.getLatestPrice();
-      const floodLevelValue = Number(currentFlood) / 1e8;
-
-      if (floodLevelValue < 3000) {
-        setTransactionStatus(
-          "Payout conditions not met. Flood level must exceed threshold."
-        );
-        setIsLoading(false);
-        setTimeout(() => setTransactionStatus(""), 5000);
-        return;
-      }
-
-      setTransactionStatus("Estimating gas...");
-
-      // Estimate gas first
+      // Get flood level from Insuracle contract
       try {
-        await contract.triggerPayout.estimateGas();
-      } catch (gasError) {
-        console.error("Gas estimation failed:", gasError);
-        throw new Error(
-          `Payout would fail: ${
-            gasError.reason || gasError.message || "Unknown error"
-          }`
+        console.log("Fetching from Insuracle at:", INSURACLE_ADDRESS);
+        setFloodLevelError("");
+        
+        const insuracleContract = new ethers.Contract(
+          INSURACLE_ADDRESS,
+          INSURACLE_ABI,
+          provider
         );
+        
+        console.log("Calling getLatestPrice()...");
+        const latestPrice = await insuracleContract.getLatestPrice();
+        console.log("Raw price from Insuracle:", latestPrice.toString());
+        
+        setRawFloodLevel(latestPrice.toString());
+        const formattedFlood = Number(latestPrice) / 1e8;
+        setFloodLevel(formattedFlood);
+        
+      } catch (e: any) {
+        console.error("Error fetching from Insuracle:", e);
+        setFloodLevelError(e.message || "Could not fetch flood level from Insuracle");
+        setRawFloodLevel("Error");
+        setFloodLevel(-1);
       }
 
-      setTransactionStatus("Triggering payout...");
-      const tx = await contract.triggerPayout();
+      // Get flood level directly from oracle
+      try {
+        console.log("Fetching from Oracle at:", MOCK_ORACLE_ADDRESS);
+        setOracleError("");
+        
+        const oracleContract = new ethers.Contract(
+          MOCK_ORACLE_ADDRESS,
+          MOCK_ORACLE_ABI,
+          provider
+        );
+        
+        console.log("Calling latestAnswer()...");
+        const latestAnswer = await oracleContract.latestAnswer();
+        console.log("Raw answer from Oracle:", latestAnswer.toString());
+        
+        setOracleFloodLevel(latestAnswer.toString());
+        
+      } catch (e: any) {
+        console.error("Error fetching from Oracle:", e);
+        setOracleError(e.message || "Could not fetch from Oracle");
+        setOracleFloodLevel("Error");
+      }
 
-      setTransactionStatus("Transaction sent. Waiting for confirmation...");
-      await tx.wait();
-
-      setTransactionStatus("Payout received successfully!");
-      setHasActivePolicy(false);
-      setInsuranceAmount(0);
-
-      // Update balances
-      const balance = await provider.getBalance(walletAddress);
-      setEthBalance(Number(ethers.formatEther(balance)));
-      const contractBal = await contract.getContractBalance();
-      setContractBalance(Number(ethers.formatEther(contractBal)));
     } catch (e: any) {
-      console.error("Payout trigger error:", e);
-      let errorMessage = "Unknown error";
-
-      if (e.reason) {
-        errorMessage = e.reason;
-      } else if (e.message) {
-        if (e.message.includes("user rejected")) {
-          errorMessage = "Transaction rejected by user";
-        } else if (e.message.includes("No active policy")) {
-          errorMessage = "No active policy found";
-        } else if (e.message.includes("Flood level below threshold")) {
-          errorMessage = "Flood level below threshold";
-        } else {
-          errorMessage = e.message;
-        }
-      }
-
-      setTransactionStatus(`Payout failed: ${errorMessage}`);
+      console.error("Provider error:", e);
+      setFloodLevelError("Provider error: " + e.message);
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    setIsLoading(false);
-    setTimeout(() => setTransactionStatus(""), 10000);
+  useEffect(() => {
+    const init = async () => {
+      const connected = await connectWallet();
+      if (connected) {
+        await fetchOracleData();
+      }
+    };
+    
+    init();
+    
+    // Set up auto-refresh every 5 seconds
+    const interval = setInterval(() => {
+      if (isConnected) {
+        fetchOracleData();
+      }
+    }, 5000);
+    
+    return () => clearInterval(interval);
+  }, [isConnected]);
+
+  const formatFloodLevel = (value: number): string => {
+    if (value === -1) return "Not Available";
+    return value.toFixed(2);
+  };
+
+  const formatRawValue = (value: string): string => {
+    if (value === "Loading..." || value === "Error" || value === "N/A") {
+      return value;
+    }
+    try {
+      const num = BigInt(value);
+      return `${num.toString()} (${(Number(num) / 1e8).toFixed(2)} normalized)`;
+    } catch {
+      return value;
+    }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-900 via-blue-900 to-indigo-900 p-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <button
-              onClick={() => setUserType && setUserType(null)}
-              className="flex items-center space-x-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-4 py-2 rounded-lg transition-all duration-200"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              <span>Back to Home</span>
-            </button>
-            <div className="flex items-center justify-center">
-              <div className="p-3 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full shadow-lg">
-                <Waves className="h-8 w-8 text-white" />
-              </div>
-            </div>
-            <div className="w-24"></div>
-          </div>
-          <h1 className="text-3xl font-bold text-white mb-2">
-            Insuracle: Flood Insurance Oracle
-          </h1>
-          <p className="text-gray-300 text-lg">
-            Buy flood insurance and claim payouts if flood levels exceed the
-            threshold.
-          </p>
+    <div className="insuracle-dashboard">
+      <h1>Insuracle Flood Monitoring Dashboard</h1>
+      
+      {!isConnected ? (
+        <div className="connection-status">
+          <p>Please connect your wallet to view oracle data</p>
+          <button onClick={connectWallet}>Connect Wallet</button>
         </div>
-
-        <div className="bg-white/10 backdrop-blur-lg border border-white/20 rounded-2xl p-8 shadow-2xl">
-          {networkError && (
-            <div className="mb-6 bg-red-500/20 border border-red-400/30 rounded-lg p-4">
-              <div className="flex items-center">
-                <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
-                <div>
-                  <p className="text-red-200 font-semibold">Wrong Network</p>
-                  <p className="text-red-300 text-sm">
-                    Please connect to Hardhat network (localhost:8545, Chain ID:
-                    31337)
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="mb-8">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                <Wallet className="h-5 w-5 text-purple-300" />
-                <span className="text-white font-medium">Connected Wallet</span>
-              </div>
-            </div>
-            <div className="bg-black/20 rounded-lg p-4 mb-4">
-              <p className="text-gray-300 font-mono text-sm break-all">
-                {walletAddress}
-              </p>
-            </div>
-            <div className="text-center">
-              <span className="text-2xl font-bold text-white">
-                Your Balance: {ethBalance.toFixed(1)} ETH
-              </span>
-            </div>
+      ) : (
+        <>
+          <div className="connection-status">
+            <p>Connected: {account.substring(0, 6)}...{account.substring(38)}</p>
           </div>
 
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-              <TrendingUp className="mr-2 h-5 w-5 text-blue-300" />
-              Flood Level
-            </h3>
-            <div className="space-y-4">
-              <div
-                className={`rounded-lg p-6 ${
-                  floodLevel >= threshold
-                    ? "bg-gradient-to-r from-red-500/20 to-orange-500/20 border border-red-400/30"
-                    : "bg-gradient-to-r from-blue-500/20 to-purple-500/20"
-                }`}
-              >
-                <div className="text-center">
-                  <div
-                    className={`text-3xl font-bold mb-2 ${
-                      floodLevel >= threshold ? "text-red-300" : "text-white"
-                    }`}
-                  >
-                    {floodLevel.toFixed(1)} units
-                  </div>
-                  <div className="text-gray-300">
-                    Threshold: {threshold.toFixed(1)}
-                  </div>
-                  {floodLevel >= threshold && (
-                    <div className="mt-2 text-red-300 font-semibold">
-                      ⚠️ THRESHOLD EXCEEDED
-                    </div>
-                  )}
-                </div>
+          <div className="oracle-data-container">
+            <h2>Oracle Data</h2>
+            
+            <div className="data-section">
+              <h3>Insuracle Contract Data</h3>
+              <div className="data-item">
+                <label>Contract Address:</label>
+                <span className="mono">{INSURACLE_ADDRESS}</span>
               </div>
-            </div>
-          </div>
-
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-              <Shield className="mr-2 h-5 w-5 text-purple-300" />
-              Insurance Policy
-            </h3>
-            <div className="space-y-4">
-              {hasActivePolicy ? (
-                <div className="bg-green-500/20 border border-green-400/30 rounded-lg p-6">
-                  <h4 className="text-green-200 font-semibold text-lg mb-4">
-                    Insurance Policy
-                  </h4>
-                  <div className="space-y-2">
-                    <p className="text-white">
-                      <span className="text-green-300">Premium:</span>{" "}
-                      {premium.toFixed(1)} ETH
-                    </p>
-                    <p className="text-white">
-                      <span className="text-green-300">Coverage:</span>{" "}
-                      {policyAmount.toFixed(1)} ETH
-                    </p>
-                    <p className="text-white">
-                      <span className="text-green-300">Status:</span> Active
-                    </p>
-                    {floodLevel >= 3000 && (
-                      <div className="mt-4">
-                        <button
-                          onClick={handleTriggerPayout}
-                          disabled={isLoading}
-                          className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 disabled:from-gray-500 disabled:to-gray-600 text-white font-bold py-3 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:transform-none"
-                        >
-                          {isLoading ? (
-                            <div className="flex items-center justify-center">
-                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                              Claiming...
-                            </div>
-                          ) : (
-                            "💰 Claim Insurance Payout"
-                          )}
-                        </button>
-                        <p className="text-red-300 text-sm mt-2">
-                          ⚠️ Emergency conditions met - claim your payout!
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="bg-yellow-500/20 border border-yellow-400/30 rounded-lg p-4">
-                  <p className="text-yellow-200 font-medium">
-                    No active policy
-                  </p>
-                </div>
-              )}
-
-              {!hasActivePolicy && (
-                <>
-                  <div className="space-y-3">
-                    <label className="block text-white font-medium">
-                      Policy Amount
-                    </label>
-                    <input
-                      type="number"
-                      value={policyAmount}
-                      onChange={(e) => setPolicyAmount(Number(e.target.value))}
-                      className="w-full bg-black/30 border border-white/20 rounded-lg px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="Enter amount"
-                    />
-                  </div>
-
-                  <div className="bg-black/20 rounded-lg p-4">
-                    <p className="text-gray-300">
-                      Premium:{" "}
-                      <span className="text-white font-bold">
-                        {premium.toFixed(4)} ETH
-                      </span>
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={handleBuyInsurance}
-                    disabled={isLoading}
-                    className="w-full bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 disabled:from-gray-500 disabled:to-gray-600 text-white font-bold py-4 px-6 rounded-lg transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:transform-none"
-                  >
-                    {isLoading ? (
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                        Processing...
-                      </div>
-                    ) : (
-                      <>
-                        <Shield className="inline mr-2 h-5 w-5" />
-                        Buy Insurance
-                      </>
-                    )}
-                  </button>
-                </>
-              )}
-            </div>
-          </div>
-
-          <div className="mb-8">
-            <h3 className="text-xl font-semibold text-white mb-4">
-              Contract Info
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-black/20 rounded-lg p-4">
-                <p className="text-gray-300 text-sm">Insurance Amount</p>
-                <p className="text-white font-bold text-lg">
-                  {insuranceAmount.toFixed(1)} ETH
-                </p>
-              </div>
-              <div className="bg-black/20 rounded-lg p-4">
-                <p className="text-gray-300 text-sm">Contract Balance</p>
-                <p className="text-white font-bold text-lg">
-                  {contractBalance.toFixed(1)} ETH
-                </p>
-              </div>
-            </div>
-          </div>
-
-          {transactionStatus && (
-            <div className="mt-6">
-              <div
-                className={`flex items-center p-4 rounded-lg ${
-                  transactionStatus.includes("successful") ||
-                  transactionStatus.includes("received")
-                    ? "bg-green-500/20 border border-green-400/30"
-                    : transactionStatus.includes("failed") ||
-                      transactionStatus.includes("Error") ||
-                      transactionStatus.includes("Wrong")
-                    ? "bg-red-500/20 border border-red-400/30"
-                    : "bg-blue-500/20 border border-blue-400/30"
-                }`}
-              >
-                {transactionStatus.includes("successful") ||
-                transactionStatus.includes("received") ? (
-                  <CheckCircle className="h-5 w-5 text-green-400 mr-3" />
-                ) : transactionStatus.includes("failed") ||
-                  transactionStatus.includes("Error") ||
-                  transactionStatus.includes("Wrong") ? (
-                  <AlertCircle className="h-5 w-5 text-red-400 mr-3" />
-                ) : (
-                  <AlertCircle className="h-5 w-5 text-blue-400 mr-3" />
-                )}
-                <span
-                  className={`font-medium ${
-                    transactionStatus.includes("successful") ||
-                    transactionStatus.includes("received")
-                      ? "text-green-200"
-                      : transactionStatus.includes("failed") ||
-                        transactionStatus.includes("Error") ||
-                        transactionStatus.includes("Wrong")
-                      ? "text-red-200"
-                      : "text-blue-200"
-                  }`}
-                >
-                  {transactionStatus}
+              <div className="data-item">
+                <label>Flood Level (Normalized):</label>
+                <span className={floodLevel === -1 ? "error" : "value"}>
+                  {formatFloodLevel(floodLevel)}
                 </span>
               </div>
+              <div className="data-item">
+                <label>Raw Value:</label>
+                <span className="mono">{formatRawValue(rawFloodLevel)}</span>
+              </div>
+              {floodLevelError && (
+                <div className="error-message">
+                  Error: {floodLevelError}
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        <div className="text-center mt-8">
-          <p className="text-gray-400 text-sm">
-            Powered by blockchain technology and smart contracts
-          </p>
-        </div>
-      </div>
+            <div className="data-section">
+              <h3>Direct Oracle Data (MockV3Aggregator)</h3>
+              <div className="data-item">
+                <label>Oracle Address:</label>
+                <span className="mono">{MOCK_ORACLE_ADDRESS}</span>
+              </div>
+              <div className="data-item">
+                <label>Latest Answer:</label>
+                <span className="mono">{formatRawValue(oracleFloodLevel)}</span>
+              </div>
+              {oracleError && (
+                <div className="error-message">
+                  Error: {oracleError}
+                </div>
+              )}
+            </div>
+
+            <div className="refresh-section">
+              <button onClick={fetchOracleData} disabled={isLoading}>
+                {isLoading ? "Loading..." : "Refresh Data"}
+              </button>
+              <p className="auto-refresh-note">Auto-refreshing every 5 seconds</p>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
-}
+};
+
+export default InsuracleDashboard;

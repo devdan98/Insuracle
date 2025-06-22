@@ -4,17 +4,24 @@ async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying contracts with:", deployer.address);
 
-  // Deploy MockV3Aggregator
+  // Deploy MockV3Aggregator first
   const MockV3Aggregator = await ethers.getContractFactory("MockV3Aggregator");
-  const mockPriceFeed = await MockV3Aggregator.deploy(8, 2000e8); // Initial flood level: 2000
-  await mockPriceFeed.waitForDeployment();
-  console.log("MockV3Aggregator deployed to:", await mockPriceFeed.getAddress());
+  const mock = await MockV3Aggregator.deploy(8, 100e8); // 8 decimals, 100cm
+  await mock.waitForDeployment();
+  const oracleAddress = await mock.getAddress();
+  console.log("MockV3Aggregator deployed to:", oracleAddress);
 
-  // Deploy Insuracle
+  // Deploy Insuracle with the new oracle address
   const Insuracle = await ethers.getContractFactory("Insuracle");
-  const insuracle = await Insuracle.deploy(await mockPriceFeed.getAddress());
+  const insuracle = await Insuracle.deploy(oracleAddress);
   await insuracle.waitForDeployment();
-  console.log("Insuracle deployed to:", await insuracle.getAddress());
+  const insuracleAddress = await insuracle.getAddress();
+  console.log("Insuracle deployed to:", insuracleAddress);
+
+  // Print for easy copy-paste
+  console.log("\n--- Copy these addresses to your .env and frontend config ---");
+  console.log("MOCK_ORACLE_ADDRESS=", oracleAddress);
+  console.log("INSURACLE_ADDRESS=", insuracleAddress);
 }
 
 main()
